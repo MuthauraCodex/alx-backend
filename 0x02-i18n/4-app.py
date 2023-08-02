@@ -6,12 +6,12 @@ from flask import Flask, render_template, request
 from flask_babel import Babel
 
 app = Flask(__name__)
-babel = Babel(app)
+
+app.url_map.strict_slashes = False
 
 
-class Config(object):
-    """
-    This class is used to configure the application.
+class Config:
+    """Represents a Flask Babel configuration.
     """
     LANGUAGES = ["en", "fr"]
     BABEL_DEFAULT_LOCALE = "en"
@@ -19,33 +19,43 @@ class Config(object):
 
 
 app.config.from_object(Config)
+babel = Babel(app)
 
 
 @babel.localeselector
 def get_locale() -> str:
-    """
-    This function is used to select the language.
+    """Determines the best match for the client's preferred language.
+
+    This function uses Flask's request object to access the client's preferred
+    languages and the app's supported languages (defined in the Config class)
+    to determine the best match. The best match is then returned as the locale.
 
     Returns:
-        str: The language.
+        str: The locale code for the best match (e.g. "en", "fr").
     """
-    locale = request.args.get('locale')
-    if locale:
-        if locale in app.config['LANGUAGES']:
-            return locale
-    return request.accept_languages.best_match(app.config['LANGUAGES'])
+    # Get the locale parameter from the incoming request
+    locale = request.args.get('locale', None)
+    # Get list of supported languages from Config
+    supported_languages = app.config["LANGUAGES"]
+    if locale and locale in supported_languages:
+        # If the locale parameter is present and is a supported locale,
+        # return it
+        return locale
+    else:
+        # Use request.accept_languages to get the best match
+        best_match = request.accept_languages.best_match(supported_languages)
+        return best_match
 
 
-@app.route('/', methods=['GET'], strict_slashes=False)
-def index() -> str:
-    """
-    This is the main page of the flask application.
+@app.route("/")
+def index_4() -> str:
+    """The index function displays the home page of the web application.
 
     Returns:
-        str: The rendered template.
+        str: contents of the home page.
     """
-    return render_template('4-index.html')
+    return render_template("4-index.html")
 
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True)

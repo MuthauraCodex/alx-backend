@@ -9,7 +9,19 @@ from typing import Dict, Union
 
 app = Flask(__name__)
 babel = Babel(app)
+app.url_map.strict_slashes = False
 
+
+class Config:
+    """Represents a Flask Babel configuration.
+    """
+    LANGUAGES = ["en", "fr"]
+    BABEL_DEFAULT_LOCALE = "en"
+    BABEL_DEFAULT_TIMEZONE = "UTC"
+
+
+app.config.from_object(Config)
+babel = Babel(app)
 users = {
     1: {"name": "Balou", "locale": "fr", "timezone": "Europe/Paris"},
     2: {"name": "Beyonce", "locale": "en", "timezone": "US/Central"},
@@ -18,74 +30,75 @@ users = {
 }
 
 
-class Config(object):
-    """
-    This class is used to configure the application.
-    """
-    LANGUAGES = ["en", "fr"]
-    BABEL_DEFAULT_LOCALE = "en"
-    BABEL_DEFAULT_TIMEZONE = "UTC"
+@app.route("/")
+def index_6() -> str:
+    """The index function displays the home page of the web application.
 
-
-app.config.from_object(Config)
+    Returns:
+        str: contents of the home page.
+    """
+    return render_template("6-index.html")
 
 
 @babel.localeselector
 def get_locale() -> str:
-    """
-    This function is used to select the language.
+    """"Returns the preferred locale for the user.
+
+    The order of priority is:
+    1. Locale from URL parameters
+    2. Locale from user settings
+    3. Locale from request header
+    4. Default locale
 
     Returns:
-        str: The language.
+        str: The preferred locale.
     """
+    # Get the locale parameter from the incoming request
     locale = request.args.get('locale')
-    if locale:
-        if locale in app.config['LANGUAGES']:
-            return locale
-    elif g.user:
-        locale = g.user.get('locale')
-        if locale in app.config['LANGUAGES']:
-            return locale
-        return app.config['BABEL_DEFAULT_LOCALE']
-    elif request.accept_languages:
-        return request.accept_languages.best_match(app.config['LANGUAGES'])
-    return app.config['BABEL_DEFAULT_LOCALE']
+    # Get list of supported languages from Config
+    supported_languages = app.config["LANGUAGES"]
+    if locale and locale in supported_languages:
+        # If the locale parameter is present and is a supported locale,
+        # return it
+        return locale
+    # Locale from user settings
+    if g.user and g.user['locale'] in app.config["LANGUAGES"]:
+        return g.user['locale']
+    header_locale = request.headers.get('locale', '')
+    if header_locale in app.config["LANGUAGES"]:
+        return header_locale
+    return request.accept_languages.best_match(app.config["LANGUAGES"])
 
 
-@app.route('/', methods=['GET'], strict_slashes=False)
-def index() -> str:
-    """
-    This is the main page of the flask application.
-
-    Returns:
-        str: The rendered template.
-    """
-    return render_template('6-index.html')
-
-
-def get_user() -> Union[dict, None]:
-    """
-    This function is used to get the user.
+def get_user() -> Union[Dict, None]:
+    """Returns a user dictionary based on the given ID
 
     Returns:
-        dict: The user.
+        Union[Dict, None]: The user dictionary if found, otherwise None.
     """
-    login_as = request.args.get('login_as')
-    if login_as and login_as.isdigit():
-        return users.get(int(login_as), None)
+    # Get the user_id from the login_as URL parameters
+    login_id = request.args.get('login_as')
+    # If the user ID exists in the URL parameters
+    if login_id:
+        # Get the user dictionary from the `users` dictionary using the user ID
+        return users.get(int(login_id))
+    # If the user ID does not exist in the URL parameters, return None
     return None
 
 
 @app.before_request
 def before_request() -> None:
+    """Function to be executed before every request.
     """
-    This function is used to set the user.
-
-    Returns:
-        None
-    """
-    g.user = get_user()
+    # Use the get_user function to get the user details
+    user = get_user()
+    # Set the user as a global variable on flask.g
+    g.user = user
 
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+# Register the before_request function to be executed before every request
+app.before_request(before_request)
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
